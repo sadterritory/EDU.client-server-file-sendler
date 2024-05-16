@@ -94,22 +94,29 @@ public class FileClient {
                     if (parts.length == 3) {
                         String filePath = parts[1];
                         String targetUsername = parts[2];
-        
+
                         File file = new File(filePath);
                         if (file.exists()) {
                             // Notify server of intent to send file
                             dos.writeUTF("SEND_FILE " + file.getName() + " " + targetUsername);
-        
+
                             // Send file length first
                             dos.writeLong(file.length());
-        
+
                             // Send file data
                             FileInputStream fis = new FileInputStream(file);
                             byte[] buffer = new byte[4096];
-                            int bytesRead;
+                            int bytesRead, blockNum = 1;
+                            System.out.println("Starting send file " + filePath + " to " + targetUsername + "...");
                             while ((bytesRead = fis.read(buffer)) != -1) {
+                                String blockStr = "block №" + blockNum + " with size " + bytesRead;
+                                System.out.print("Sending " + blockStr + "... ");
+                                dos.writeUTF(blockStr);
                                 dos.write(buffer, 0, bytesRead);
+                                System.out.println("Successfully sent");
+                                blockNum++;
                             }
+                            System.out.println("All blocks were sent");
                             fis.close();
                         } else {
                             System.out.println("File does not exist: " + filePath);
@@ -128,21 +135,27 @@ public class FileClient {
                 String fileName = msgParts[0];
                 String fromUsername = msgParts[2];
                 long fileLength = dis.readLong();
-    
+
                 File userDir = new File(username);
                 if (!userDir.exists()) {
                     userDir.mkdir();
                 }
-    
+
                 File file = new File(userDir, fileName);
                 FileOutputStream fos = new FileOutputStream(file);
-    
+
                 byte[] buffer = new byte[4096];
-                int bytesRead;
-                while (fileLength > 0 && (bytesRead = dis.read(buffer, 0, (int)Math.min(buffer.length, fileLength))) != -1) {
+                int bytesRead = -2;
+                System.out.println("Starting receive file " + fileName + " from client " + fromUsername + "...");
+                while (fileLength > 0 && bytesRead != -1) {
+                    String blockStr = dis.readUTF();
+                    bytesRead = dis.read(buffer, 0, (int)Math.min(buffer.length, fileLength));
+                    System.out.print("Got " + blockStr + ". Writing to file... ");
                     fos.write(buffer, 0, bytesRead);
+                    System.out.println("Successfully written");
                     fileLength -= bytesRead;
                 }
+                System.out.println("File was received fully");
                 fos.close();
 
                 System.out.println("Received file: " + fileName + " from " + fromUsername);

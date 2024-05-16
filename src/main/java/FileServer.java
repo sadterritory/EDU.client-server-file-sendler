@@ -60,23 +60,31 @@ public class FileServer {
                         if (parts.length == 3) {
                             String fileName = parts[1];
                             String targetUsername = parts[2];
-                    
+
                             DataOutputStream targetDos = clientMap.get(targetUsername);
                             if (targetDos != null) {
                                 // Inform the target client a file is coming
                                 targetDos.writeUTF("RECEIVE_FILE " + fileName + " from " + this.clientName);
-                    
+
                                 // Read file length
                                 long fileLength = dis.readLong();
                                 targetDos.writeLong(fileLength);
-                                
+
                                 // Buffer for file transfer
                                 byte[] buffer = new byte[4096];
-                                int bytesRead;
-                                while (fileLength > 0 && (bytesRead = dis.read(buffer, 0, (int)Math.min(buffer.length, fileLength))) != -1) {
+                                int bytesRead = -2;
+                                System.out.println("Starting resending file " + fileName + " from "
+                                        + this.clientName + " to " + targetUsername + "...");
+                                while (fileLength > 0 && bytesRead != -1) {
+                                    String blockStr = dis.readUTF();
+                                    bytesRead = dis.read(buffer, 0, (int)Math.min(buffer.length, fileLength));
+                                    System.out.print("Got " + blockStr + ". Resending... ");
+                                    targetDos.writeUTF(blockStr);
                                     targetDos.write(buffer, 0, bytesRead);
+                                    System.out.println("Successfully resent");
                                     fileLength -= bytesRead;
                                 }
+                                System.out.println("All blocks were sent");
                                 dos.writeUTF("ACK_FILE_RECEIVED " + fileName);
                                 System.out.println("File " + fileName + " sent from " + this.clientName + " to " + targetUsername);
                             } else {
